@@ -15,6 +15,9 @@ You can install the development version of PhytoNokoueTPR from [GitHub](https://
 devtools::install_github("acapet/PhytoNokoueTPR")
 ```
 
+## Accessing TP files
+
+We use .Rmd files for interactive practical sessions.
 To access the first TP in the editor, copy the following in the console, and execute.
 
 ``` r
