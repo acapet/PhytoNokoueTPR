@@ -1,0 +1,184 @@
+---
+title: "TP1 - Data Exploration"
+author: "Arthur Capet"
+date: "2024-03-17"
+pdf_document:
+    toc: yes
+    toc_depth : 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+```
+
+
+# Loading Packages and Functions
+Load the required packages
+(vegan must be loaded after ade4 to avoid some conflicts)
+
+```{r}
+
+library(readxl)
+
+# library(vegan)        
+# 
+# source("../Functions/panelutils.R")
+# source("../Functions/coldiss.R")
+# source("../Functions/evplot.R")
+# source("../Functions/hcoplot.R")
+# source("../Functions/Answers.R")
+
+# library(lubridate)
+# library(gdata)
+# library(ggplot2)
+# require(reshape2)
+# require(plyr)
+# 
+# library(ade4)
+# library(cluster)
+# library(RColorBrewer)
+
+# Package not available currently
+## library(labdsv)
+## library(kableExtra)
+```
+
+
+# Part 1 : Basic R.
+
+## Variables
+In R we can assign value to variables, and use them afterwards for computation.
+
+```{r}
+a <- 4
+print(4+a)
+```
+
+*Variables* can have different types : 
+  - "numeric" is a number (real).
+  - "chr" is a character string.
+
+```{r}
+# We can also include comment lines in code blocs.
+print("The type and value of 'a' are :")
+typeof(a)
+print(a)
+```
+
+
+```{r}
+# Let's define a "character string" variables
+b <- 'Hello'
+print("The type and value  of 'b' is :")
+typeof(b)
+print(b)
+```
+
+
+```{r}
+print("The type and value  of 'TRUE' is :")
+typeof(TRUE)
+print(TRUE)
+```
+
+
+```{r}
+myflag <- 1+1==2
+print("The type and value  of myflag is :")
+typeof(myflag)
+print(myflag)
+```
+
+Those are variables that contain only a single element.
+Sometimes, it is usefull to build vector variables that contains several elements.
+
+```{r}
+A <- c(1,2,3)
+print(A)
+```
+
+Vectors can be built for variables of any type.
+```{r}
+B <- c('Hello','World')
+B
+```
+```{r}
+C <- A < 3
+print(C)
+```
+Of course, methods exists to build vectors in one go : 
+```{r}
+print(seq (from = 1, to = 8, by = 2))
+print(1:4)
+print(5:-1)
+```
+
+
+## Functions
+
+In general, we use functions apply the same operation to different arguments.
+
+```{r}
+squaremynumber <- function(number){
+  return(number*number)
+}
+
+print("The type and value  of 'squaremynumber' is :")
+typeof(squaremynumber)
+
+print (squaremynumber(2))
+
+print (squaremynumber(5))
+
+print (squaremynumber(A))
+```
+
+
+# Part 2 : Data load and manipulation 
+
+We received monitoring data from the Lake Nokoué.
+These have been stored in an '.xls' file. Our first objective is to read these data and import them in an interactive R session.
+
+```{r}
+filename <- system.file("data-raw", "nokoue.xlsx", package="PhytoNokoueTPR")
+print(filename)
+```
+
+
+```{r}
+dfmai <- read_excel(filename,"Mai")
+dfmai
+```
+
+The `dfmai` variable now contains a **Tibble Dataframe** (we'll just use the word "**dataFrame**").
+This is a very convenient variable type for data analysis. It contains different columns ("Variables") and rows ("Observations").
+The nice thing with that type is that different columns can have different types (off course all observations in a given column has to have the same type).
+
+The content of a given column can be accessed simply : 
+```{r}
+print(dfmai$T)
+```
+
+.. and there are plenty of command to manipulate them, for instance for subsetting,  
+
+```{r}
+subset(dfmai, dfmai$T>29.5)
+```
+
+What we need to do now is :
+  - Ensure that observations have the correct type. 
+  - Gather all months in a single large data frame. 
+  - Build a descriptor dataframe with units and definitions. 
+  
+## Observation type
+
+The columns in our data frame are of different nature. We need to distinguish : 
+
+  - Coordinates variables : Those are not analysed **per se**, but are used as a reference basis to analyze other variables. 
+      - Sites : The name of each sampling site (ie. Spatial Coordinate)
+      - Mois : The month of each sampling site (ie. Temporal Coordinate)
+      - X, Y : Geospatial references, i.e. to produce maps. 
+  - Environmental variables : 
+      
+      
