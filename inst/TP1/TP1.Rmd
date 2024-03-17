@@ -10,7 +10,7 @@ title: "Workshop PhytoNokoué - TP1 - Data Loading"
 
 ```{r setup, include=FALSE}
 # Loading required packages
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, results='hide')
 library(readxl)
 library(ggplot2)
 library(reshape2)
