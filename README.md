@@ -15,4 +15,8 @@ You can install the development version of PhytoNokoueTPR from [GitHub](https://
 devtools::install_github("acapet/PhytoNokoueTPR")
 ```
 
-Once done, please consider opening one of the .Rmd files in the directory `data-raw`.
+To access the first TP in the editor, copy the following in the console, and execute.
+
+``` r
+file.edit(system.file('TP1','TP1.Rmd',package = 'PhytoNokoueTPR'))
+``` r
