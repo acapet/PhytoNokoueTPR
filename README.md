@@ -19,4 +19,4 @@ To access the first TP in the editor, copy the following in the console, and exe
 
 ``` r
 file.edit(system.file('TP1','TP1.Rmd',package = 'PhytoNokoueTPR'))
-``` r
+```
