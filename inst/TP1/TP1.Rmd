@@ -18,9 +18,11 @@ library(dplyr)
 ```
 
 
-# Part 1 : Basic R.
+# JOUR 1
 
-## Variables
+## Part 1 : Basic R.
+
+### Variables
 
 In R we can assign value to variables, and use them afterwards for computation.
 
@@ -82,6 +84,7 @@ B
 C <- (A < 10)
 print(C)
 ```
+
 Of course, methods exists to build vectors implicitly : 
 ```{r}
 print(seq (from = 1, to = 8, by = 2))
@@ -90,7 +93,7 @@ print(5:-1)
 ```
 
 
-## Functions
+### Functions
 
 In general, we use functions to apply the same operation to different arguments.
 
@@ -107,7 +110,7 @@ print (squaremynumber(A))
 ```
 
 
-# Part 2 : Data load and first manipulation 
+## Part 2 : Data load and first manipulation 
 
 We received monitoring data from the Lake Nokoué.
 These have been stored in an '.xls' file. Our first objective is to read these data and import them in an interactive R session.
@@ -150,7 +153,7 @@ What we need to do now is :
   - Ensure that observations have the correct type. 
   - Gather all months in a single large data frame. 
 
-## Variable Description Dataframe.
+### Variable Description Dataframe.
 
 The columns in our data frame are of different nature. We need to distinguish : 
 
@@ -179,11 +182,11 @@ for (v in colnames(dfmai)){
   
 }
 
-
 ```
 
+# JOUR 2
   
-## Observation type
+### Observation type
 
 But Species counts should un fact be given as integers !! 
 
@@ -204,23 +207,33 @@ for (v in subset(dfvar, dfvar$Type=="Species")$Parameters){
 dfmai
 ```
       
-## Combining dataframe for the different months. 
+### Combining dataframe for the different months. 
 
 We have one sheet per month. It will be much more convenient to have all data in a single data frame. 
 Since we have to apply the conversion to integer, we can make a function to load a monthly data frame. 
 
 ```{r}
+# A function to load monthly data frames
 load_monthly_df <- function(monthstr){
+  # Parameters
+  #   - monthsr - an character string corresponding to one of the sheets of our .xlsx file.
+  # Value
+  #   - A data frame with data for one month.
+  
+  # Read the corresponding sheet
   df <- read_excel(filename,monthstr)
+  
+  # Loop on Species parameters to convert towards integers.
   for (v in subset(dfvar, dfvar$Type=="Species")$Parameters){
     df[[v]] <-as.integer(df[[v]]) 
   }
+  
+  # The command to return the result of the function.
   return(df)
 }
 ```
 
-
-This is just to show that the function works.
+This is just to check that the function works.
 
 ```{r}
 df <- load_monthly_df('Fevrier')
@@ -228,7 +241,7 @@ df <- load_monthly_df('Fevrier')
 df
 ```
 
-Now we will use this function in a loop, to build a list of dataframes, i.e. a single variable object that includes all the dataframe.
+Now we will use this function in a loop, to build *a list of dataframes*, i.e. a single variable object that includes all the dataframe.
 
 ```{r}
 listofdf <- list()
@@ -242,7 +255,7 @@ for (i in 1:12){
 }
 ```
 
-Now we have a list of dataframes, but we still need to gather them in a single dataframe. This operation is called concatenate, and can be achieved with the function rbind, where 'r' stands for 'rows' (the different dataframes are to be considered as group of rows of a larger dataframe).
+Now we have a list of dataframes, but we still need to gather them in a single dataframe. This operation is called concatenate, and can be achieved with the function `rbind`, where 'r' stands for 'rows' (the different dataframes are to be considered as group of *rows* of a larger dataframe).
 
 ```{r}
 dfdata <- do.call(rbind, listofdf)
@@ -250,7 +263,15 @@ dfdata <- do.call(rbind, listofdf)
 
 Our dataset is ready .. or almost.
 
-# First plots (using ggplot)
+## First plots (using ggplot)
+
+Ggplot is a very powerful tool to explore datasets. It as a very particular syntax. The step to consider are : 
+
+1. Which is the dataframe I want to use for my plot.
+2. What variable should be used for what aspects (or "Aestethic") of the graph ( think, on what shold be based the x-axis coordinate, y-axis coordinate, the color, the size of the points, etc ...)
+3. What kind of plot do i want to produce ? Points? Lines ? Bars ? 
+
+Here is a simple example, where we use the dataframe `dfdata`, to build a scatterplot (points) with showing temperature, as a function of the months.
 
 ```{r}
 ggplot(dfdata, aes(x=Mois, y = T))+geom_point()
@@ -263,9 +284,81 @@ We can clarify this, byt defining this column as a set of 'factors'. Factors are
 ```{r}
 dfdata$Mois <- factor(dfdata$Mois, ordered=TRUE, levels=monthnames)
 
-ggplot(dfdata, aes(x=Mois, y = Sal))+geom_point()
+ggplot(dfdata, aes(x=Mois, y = T))+geom_point()
+```
+
+
+If we want to show stations in colors, we just have to do :       
+```{r}
+ggplot(dfdata, aes(x=Mois, y = T, color = Sites))+geom_point()
 ```
       
+
+Then, of course, there is plenty of way to modify graphical apsects of the figure :
+```{r}
+ggplot(dfdata, aes(x=Mois, y = T, color = Sites))+
+  geom_point()+
+  theme_bw()+ theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))
+```
+To show sme cool feature of ggplot, we need month as a numeric variables. Let's add it to the data.frame.
+Because I'm lay, I'll just the integer underlying the factor format we have given to `dfdata$Mois`.
+
+```{r}
+dfdata$Monthnumber <- as.integer(dfdata$Mois)
+```
+
+      
+```{r}
+ggplot(dfdata, aes(x=Monthnumber, y = T))+
+  geom_smooth()+
+  theme_bw()+ theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))
+```
+
+      
+```{r}
+ggplot(dfdata, aes(x=Mois, y = T))+
+  geom_boxplot()+
+  theme_bw()+ theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))
+
+```
+
+
+      
+```{r}
+ggplot(dfdata, aes(x=Mois, y = T))+
+  geom_boxplot()+
+  geom_point(aes(color = Sites))+
+  theme_bw()+ theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))
+```
+
+
+### Exercices GGplot
+
+Faire des boxplots de la Salinité en fonction des Stations
+
+```{r}
+
+```
+
+
+
+Build a scatter plot of your favorite chemical variable as a function of Salinity.
+
+```{r}
+
+```
+
+
+## dplyr package, to analyse dataframe
+
+Split - Apply - Combine 
+
+```{r}
+dfdata %>% group_by(Sites) %>% summarise(MeanT=mean(T))
+```
+
+
+## Long and Wide format      
 In general, it is easier to work in ggplot with 'long' table format, rather than 'wide' table format. 
 We can pass from 'wide' to 'long' using the command `melt`.
       
@@ -275,6 +368,17 @@ ldf
 ```
 
 
+
+```{r}
+ldf %>% group_by(Sites, variable) %>% summarise(Mean=mean(value))
+```
+
+Exercice : use dply to identify median value of all variables per month.
+```{r}
+
+```
+
+## GG facet plots
 Now, we can use a bit more advanced ggplot nomenclature to build more complex plots.
 
 ```{r, fig.height=15, fig.width=10}
@@ -286,13 +390,10 @@ ggplot(envdf, aes(x=Mois, y = value))+
   facet_wrap(vars(variable), scales = "free_y", ncol=3)+
   theme_bw()+ theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))
 ```
+
+Find a way to represent the spatiual variability for a given variable
+
 ```{r, fig.height=15, fig.width=10}
-ggplot(subset(ldf, ldf$variable=='pH'), aes(x=X, y = Y, color=value))+
-  geom_point(size=3)+
-  # geom_boxplot()+
-  facet_wrap(vars(Mois), scales = "free_y", ncol=3)+
-  theme_bw()+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
-  scale_color_viridis_c()
 
 ```
 
