@@ -1,0 +1,710 @@
+---
+title: "Phytoplankton inventory and relationships with environmental factors in Nokoué lake in Bénin (West Africa)"
+author: "Firmin M. ADANDEDJI1, 2, Arthur CAPET3, Héloise LAVIGNE3, Anne Julie ROCHETTE3, Daouda MAMA1,2"
+date: "2024-05-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(lubridate)
+
+
+library(ade4)
+library(vegan)        
+library(gclus)        
+
+library(cluster)
+library(RColorBrewer)
+library(gridExtra)
+
+source('./coldiss.R')
+source('./hcoplot.R')
+source('./cleanplot.PCA.R')
+source('./panelutils.R')
+```
+
+
+```{r}
+filename <-"./Data_phytonokoue_new.xlsx"
+df <-  read_excel(filename,  col_types = c(c("text", "numeric", "numeric", "text", "text", "date"), rep('numeric', 24)))
+# Arranging date format
+df$datetime <- dmy_hms(paste(df$Date,format(df$Heure, "%H:%M:%S")))
+df <- df %>% select(-Date, -Heure, -Month)
+
+df
+```
+
+```{r}
+dfvar <- read_excel(filename,"Units")
+dfvar <- dfvar %>% add_row(Parameters = "datetime", Unit = "-", Type = "coord") %>%
+  add_row(Parameters = "X", Unit = "-", Type = "coord") %>%
+  add_row(Parameters = "Y", Unit = "-", Type = "coord") %>% 
+  add_row(Parameters = "Sites", Unit = "-", Type = "coord")
+
+dfvar
+```
+
+
+```{r}
+ldf <- melt(df, id.vars = subset(dfvar, dfvar$Type=='coord')$Parameters )
+```
+
+
+```{r, fig.height=10, fig.width=8}
+
+envdf <- subset(ldf, ldf$variable %in% subset(dfvar, dfvar$Type == 'env')$Parameters)
+
+
+envdf$Mois <- as.numeric(month(envdf$datetime))#factor(month(envdf$datetime), ordered=TRUE, levels=month.abb)
+
+
+ggplot(envdf, aes(x=Mois, y = value))+
+  geom_point(aes( color=Sites))+
+  geom_boxplot(aes(group=Mois),alpha=.7)+
+  facet_wrap(vars(variable), scales = "free_y", ncol=4)+
+  theme_bw()+theme(legend.position='bottom')+ 
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))+
+  guides(color=guide_legend(nrow=2,byrow=TRUE))+
+  xlab("Months")+ylab('[log(ind/mL)]')+scale_x_continuous(breaks = 1:12, labels = month.abb)
+
+```
+
+
+```{r, fig.height=8, fig.width=10}
+spedf <- subset(ldf, ldf$variable %in% subset(dfvar, dfvar$Type == 'spe')$Parameters)
+spedf$Mois <- as.numeric(month(spedf$datetime))
+```
+
+```{r, fig.height=8, fig.width=10}
+ggplot(spedf, aes(x=month(datetime), y = log(value+1)))+
+  geom_point(aes( color=Sites))+
+  geom_boxplot(aes(group=month(datetime)),alpha=.7)+
+  facet_wrap(vars(variable), ncol=4)+
+  theme_bw()+ theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))+
+  xlab("Months")+ylab('[log(ind/mL)]')+scale_x_continuous(breaks = 1:12, labels = month.abb)
+```
+
+
+```{r, fig.height=8, fig.width=10}
+ggplot(spedf, aes(x=Sites, y = log(value+1)))+
+  geom_point(aes(color=Sites))+
+  geom_boxplot(aes(group=Sites),alpha=.7)+
+  facet_wrap(vars(variable), ncol=2, scale='free_y')+
+  theme_bw()+ theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))+
+  xlab("Months")+ylab('[log(ind/mL)]')#+scale_x_continuous(breaks = 1:12, labels = month.abb)
+```
+
+## Maps
+
+
+```{r}
+library(ggmap)
+bmap <- get_stadiamap(bbox = c(left = 2.33, right = 2.57, bottom = 6.35, top=6.53), maptype = "stamen_terrain", zoom = 12, where='.')
+```
+
+```{r}
+monthnames <-  month.abb
+names(monthnames) <- seq(1:12)
+```
+
+
+## Mapping
+
+```{r, fig.width=12}
+mapmyenv<- function (eee){
+  p <- ggmap(bmap)+
+  geom_point(subset(envdf, variable==eee),  mapping = aes(x = X, y = Y, color=value))+facet_wrap('Mois',labeller=as_labeller(monthnames))+scale_color_viridis_c(name= paste(subset(dfvar, Parameters==eee)$Title,subset(dfvar, Parameters==eee)$Unit, sep='\n' ))
+  return(p)
+}
+
+mapmyspe<- function (eee){
+  p <- ggmap(bmap)+
+    geom_point(subset(spedf, variable==eee),  mapping = aes(x = X, y = Y,color=log(value+1)))+
+    facet_wrap('Mois',labeller=as_labeller(monthnames))+
+    scale_color_viridis_c(name= paste(subset(dfvar, Parameters==eee)$Title,"[log(ind/mL)]", sep='\n' ))
+  return(p)
+}
+```
+
+
+```{r}
+if (TRUE){
+  # Saves monthly maps in PNG file for every environmental variables
+  for (eee in subset(dfvar, Type=="env")$Parameters){
+    png(paste0("./",eee,"_map.png"), width = 8, height = 5, unit="in", res=200)
+    p <- mapmyenv(eee)
+    print(p)
+    dev.off()
+  }
+  
+  # Saves monthly maps in PNG file for every species variables
+  for (eee in subset(dfvar, Type=="spe")$Parameters){
+    png(paste0("./",eee,"_map.png"), width = 8, height = 5, unit="in", res=200)
+    p <- mapmyspe(eee)
+    print(p)
+    dev.off()
+  }
+}
+```
+
+
+```{r, eval=FALSE}
+
+for (eee in subset(dfvar, Type=="env")$Parameters){
+  p <- mapmyenv(eee)
+  print(p)
+}
+```
+
+
+
+```{r}
+
+# Saves monthly maps in PNG file for every species variables
+for (eee in subset(dfvar, Type=="spe")$Parameters){
+  p <- mapmyspe(eee)
+  print(p)
+}
+```
+
+
+# Species 
+
+Some summary stats for the plankton counts : 
+```{r}
+
+spesum <- spedf %>% 
+  filter(!is.na(value)) %>%
+  group_by(variable, month(datetime)) %>% 
+  summarize(
+    spotstation=sum(value>0),
+    max.count=max(value),
+    mean.count=mean(value),
+    mean.count.logp1=mean(log(value+1)),
+    mean.spot.count=mean(value[value>0])) 
+
+
+spesum <- rename(spesum, Month='month(datetime)')
+```
+
+### Spatial distribution
+
+This shows the number of stations where the class is spotted at least once. 
+
+
+
+
+```{r}
+ggplot(spesum,aes(x = Month, y= spotstation/20*100))+geom_bar(stat="identity", position=position_dodge())+facet_wrap(~variable)+ylab('Number of stations where spotted (%)')+
+  scale_x_continuous(breaks = 1:12, labels = month.abb)+
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=1))
+```
+
+## Applying cluster stuffs
+
+Requires transformation back to wide format. 
+```{r}
+d.spe <- spedf %>% 
+  subset(select=c("datetime", "Sites", "variable","value")) %>%
+  dcast(datetime + Sites ~ variable)
+
+
+casteddates <- d.spe$datetime
+castedSites <- d.spe$Sites
+
+d.spe <- d.spe %>%
+  select(-c("Sites","datetime")) 
+
+d.spe
+```
+
+```{r}
+
+# Bray-Curtis Dissimilarity for raw data
+spe.db <- vegdist(d.spe)
+
+# Bray-Curtis Dissimilarity for Log-transformed data
+spe.log <- decostand(d.spe,'log')
+spe.dbL <- vegdist(spe.log)
+
+# Chord distance
+spe.norm <- decostand(d.spe,'norm')
+spe.dc <- dist(spe.norm)
+
+# Hellinger
+spe.hel <- decostand(d.spe,'hel')
+spe.dh <- dist(spe.hel)
+
+coldiss(spe.dc,byrank = FALSE,diag=FALSE); title("Chord")
+coldiss(spe.dh,byrank = FALSE,diag=FALSE); title("Hellinger")
+
+spe.norm <- decostand(d.spe,"norm")
+spe.dist <- dist(spe.norm)
+```
+
+
+
+```{r}
+spe.dist.single   <- hclust(spe.dist, method= "single")
+plot(spe.dist.single)
+
+spe.dist.complete <- hclust(spe.dist, method= "complete")
+plot(spe.dist.complete)
+
+spe.dist.average  <- hclust(spe.dist, method= "average")
+plot(spe.dist.average)
+
+spe.dist.centroid <- hclust(spe.dist, method= "centroid")
+plot(spe.dist.centroid)
+
+spe.dist.ward     <- hclust(spe.dist, method= "ward.D2")
+spe.dist.ward$height <- sqrt(spe.dist.ward$height)
+plot(spe.dist.ward)
+
+```
+"Average" gives the best cophenetic correlation. 
+
+```{r}
+
+cophDF <- data.frame(method = c("Single","Complete","Average","Centroid","Ward"), CophCorr= NA)
+rownames(cophDF)<- cophDF$method
+
+spe.dist.single.coph <- cophenetic(spe.dist.single)
+cophDF["Single","CophCorr"] <- cor(spe.dist,spe.dist.single.coph)
+
+spe.dist.complete.coph <- cophenetic(spe.dist.complete)
+cophDF["Complete","CophCorr"] <- cor(spe.dist,spe.dist.complete.coph)
+
+spe.dist.average.coph <- cophenetic(spe.dist.average)
+cophDF["Average","CophCorr"] <- cor(spe.dist,spe.dist.average.coph)
+
+spe.dist.centroid.coph <- cophenetic(spe.dist.centroid)
+cophDF["Centroid","CophCorr"] <- cor(spe.dist,spe.dist.centroid.coph)
+
+spe.dist.ward.coph <- cophenetic(spe.dist.ward)
+cophDF["Ward","CophCorr"] <- cor(spe.dist,spe.dist.ward.coph)
+
+cophDF
+
+```
+
+```{r}
+
+finalClust <- spe.dist.average
+
+plot(finalClust$height, nrow(d.spe):2, type="S",
+     main = "Fusion levels - Chord - Average (UPGMA)", 
+     ylab = "k (number of clusters)", 
+     xlab = "h (node height)", 
+     col="grey")
+text (finalClust$height, nrow(d.spe):2,nrow(d.spe):2,col="red", cex=0.8)
+```
+
+```{r}
+kfix <-6
+
+spebc.single.g    <- cutree(spe.dist.single,k=kfix)
+spebc.complete.g  <- cutree(spe.dist.complete,k=kfix)
+spebc.average.g   <- cutree(spe.dist.average,k=kfix)
+spebc.centroid.g   <- cutree(spe.dist.centroid,k=kfix)
+spebc.ward.g      <- cutree(spe.dist.ward,k=kfix)
+
+
+table(spebc.average.g, spebc.centroid.g)
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+asw <- numeric(nrow(d.spe))
+
+
+for (k in 2:(nrow(d.spe)-1)){
+  sil <- silhouette(cutree(finalClust, k=k), spe.dist)
+  asw[k]<-summary(sil)$avg.width
+}
+
+k.best <- which.max(asw)
+
+plot( 1:nrow(d.spe) , asw, type= 'h', 
+      main = paste0("Silhouette optimal number of cluster for ", finalClust$method,',',finalClust$dist.method))
+axis(1, k.best, col='red')
+points(k.best, max(asw), col='red')
+```
+```{r}
+
+finalk     <- 6
+
+cutg <- cutree(finalClust,k=finalk)
+sil  <- silhouette(cutg, spe.dist) 
+silo <- sortSilhouette(sil)
+rownames(silo) <- row.names(d.spe)[attr(silo,"iOrd")]
+
+cutgo <- cutg[attr(silo,"iOrd")]
+
+plot(silo, main= paste0( "silhouette Plot - ", finalClust$method,',',finalClust$dist.method," - k = ", finalk),
+     cex.names=0.8, col=cutgo+1, nmax.lab = 100)
+```
+
+```{r}
+spe.chwo<-reorder.hclust(finalClust,spe.dist)
+hcoplot(finalClust, spe.dist, k=finalk)
+
+```
+
+
+```{r}
+d.spe.clust       <- decostand(d.spe,'total')
+d.spe.clust$datetime <- casteddates
+d.spe.clust$g     <- cutg
+d.spe.clust$sil   <- sil[,3]
+
+```
+
+
+```{r Visu Spe 2}
+ggplot(melt(d.spe.clust, id.vars = c("datetime","g","sil")), aes(x=g, y=(value), group=factor(g))) +
+  geom_boxplot()+
+    geom_point(aes(color=sil))+scale_color_viridis_c()+
+    facet_wrap(~variable)+theme_bw()
+
+
+ggplot(melt(d.spe.clust, id.vars = c("datetime","g","sil")), aes(x=variable, y=(value), group=variable)) +
+  geom_boxplot()+
+    geom_point(aes(color=sil))+scale_color_viridis_c()+
+    facet_wrap(~g)+theme_bw()+ theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=.4))
+
+```
+
+
+```{r}
+d.spe.clust %>% filter(g==3) #%>% select(c('Sites','Mois'))
+```
+
+
+```{r, fig.height=5}
+d.spe.clust$month<-factor(month(d.spe.clust$datetime))
+d.spe.clust$year<-factor(year(d.spe.clust$datetime))
+
+drel <- d.spe.clust %>% group_by(month) %>% summarize ( rel.1= sum(g==1)/length(g),
+                         rel.2= sum(g==2)/length(g),
+                         rel.3= sum(g==3)/length(g),
+                         rel.4= sum(g==4)/length(g),
+                         rel.5= sum(g==5)/length(g),
+                         rel.6= sum(g==6)/length(g))
+
+ggplot(melt(drel,id.vars = c('month')), aes(x=month, y=value, fill=variable)) +
+  geom_bar(stat = 'identity')+
+  scale_x_discrete(breaks=seq(1,12),labels=month.abb, name="")+theme_bw()
+```
+
+```{r, fig.width=12}
+
+d.spe.clust$Sites <- castedSites
+
+d.spe.clust$Mois <- as.numeric(month(d.spe.clust$datetime))
+
+bibi <- merge(d.spe.clust, select(df,c("Sites",'X',"Y")), by = "Sites")
+
+
+ggmap(bmap)+
+    geom_point(bibi,  mapping = aes(x = X, y = Y,color=factor(g)), size=5)+
+    facet_wrap('Mois',labeller=as_labeller(monthnames))+
+    scale_color_brewer(palette = 'Set3')
+
+
+```
+
+
+```{r}
+spe.T<-t(d.spe)
+
+spe.t.chi <- decostand(spe.T, method = "chi.square")
+spe.t.D16 <- dist(spe.t.chi)
+
+coldiss(spe.t.D16,diag = TRUE)
+
+```
+
+
+```{r, fig.width=20}
+
+require(GGally)
+
+d.env <- envdf %>% 
+  subset(select=c("datetime", "Sites", "variable","value")) %>%
+  dcast(datetime + Sites ~ variable)%>%
+  select(-c("Sites","datetime")) 
+
+ggpairs(d.env, columns = 1:16)
+
+
+# , lower = panel.smooth, 
+#       upper = panel.cor, diag = panel.hist, main= "Kendall Correlation Matrix", method="kendall")
+# 
+# pairs(d.env.allvalid, lower.panel = panel.smooth, 
+#       upper.panel = panel.cor, diag.panel = panel.hist, main= "Pearson Correlation Matrix", method="pearson")
+# 
+# pairs(d.env.allvalid, lower.panel = panel.smooth, 
+#       upper.panel = panel.cor, diag.panel = panel.hist, main= "Spearman Correlation Matrix", method="spearman")
+
+```
+
+## Ordination
+
+```{r, fig.width=10}
+envdf
+
+ggplot(envdf, aes(x=value))+
+         geom_histogram(bins=50)+
+         geom_density()+
+         facet_wrap(~variable, scales = 'free')+
+  theme_bw()
+```
+
+```{r}
+d.env <- envdf %>% filter(month(datetime)!=6)%>%
+  subset(select=c("datetime", "Sites", "variable","value")) %>%
+  dcast(datetime + Sites ~ variable)
+
+casteddates <- d.env$datetime
+castedSites <- d.env$Sites
+
+d.env <- d.env %>%
+  select(-c("Sites","datetime")) 
+
+d.env
+```
+
+
+
+
+```{r}
+require(tidyr)
+
+transformations <- list(
+  original = function(x) x,
+  log = function(x) ifelse(x > 0, log(x), NA),
+  sqrt = function(x) ifelse(x >= 0, sqrt(x), NA),
+  standard = function(x) scale(x),
+  stand_sqrt = function(x) scale(sqrt(x))
+)
+
+
+# Initialize an empty list to store the results
+shapiro_results <- list()
+
+# Loop over each transformation
+for (transformation_name in names(transformations)) {
+  transformation_func <- transformations[[transformation_name]]
+  
+  # Apply the transformation and store the results of the Shapiro-Wilk test
+  shapiro_result <- d.env %>%
+    mutate(across(everything(), transformation_func)) %>%
+    summarise(across(everything(), ~shapiro.test(.x)$p.value))
+  
+  # Add the transformation name as a column
+  shapiro_result <- shapiro_result %>%
+    mutate(transformation = transformation_name)
+  
+  # Append the result to the list
+  shapiro_results[[transformation_name]] <- shapiro_result
+}
+
+# Combine all the results into a single data frame
+final_results <- bind_rows(shapiro_results) %>%
+  pivot_longer(-transformation, names_to = "variable", values_to = "shapiro_p_value")
+
+# Print the final results
+print(final_results)
+
+ggplot(final_results, aes(y=log10(shapiro_p_value), x=variable, color=transformation))+
+         geom_point()+geom_hline(yintercept = -2)
+       
+```
+
+
+```{r}
+
+subset(dfvar, Type=='env')$Parameters
+
+```
+
+
+```{r}
+d.env.sc<-decostand(sqrt(d.env), 'standardize')
+
+env.pca <- rda(d.env.sc) # Argument scale=TRUE calls for a
+                                  # standardization of the variables
+env.pca
+summary(env.pca) # Default scaling 2
+summary(env.pca, scaling=1)
+
+```
+
+
+## Examine and plot partial results from PCA output
+```{r, fig.height=5}
+
+# Eigenvalues
+ev <- env.pca$CA$eig
+
+# Apply Kaiser-Guttman criterion to select axes
+ev[ev > mean(ev)]
+
+# Broken stick model
+n <- length(ev)
+bsm <- data.frame(j=seq(1:n), p=0)
+bsm$p[1] <- 1/n
+for (i in 2:n) {
+	bsm$p[i] = bsm$p[i-1] + (1/(n + 1 - i))
+}
+bsm$p <- 100*bsm$p/n
+bsm
+
+# Plot eigenvalues and % of variance for each axis
+par(mfrow=c(2,1))
+barplot(ev, main="Eigenvalues", col="bisque", las=2)
+abline(h=mean(ev), col="red")	# average eigenvalue
+legend("topright", "Average eigenvalue", lwd=1, col=2, bty="n")
+barplot(t(cbind(100*ev/sum(ev),bsm$p[n:1])), beside=TRUE, 
+	main="% variance", col=c("bisque",2), las=2)
+legend("topright", c("% eigenvalue", "Broken stick model"), 
+	pch=15, col=c("bisque",2), bty="n")
+```
+
+```{r, fig.height=4}	
+# Same plots using a single function:
+# Plot eigenvalues and % of variance for each axis
+evplot(ev)
+```
+
+```{r}
+plot(env.pca)
+```
+
+```{r, fig.height=4}
+# Plots using cleanplot.pca
+# A rectangular graphic window is needed for the two plots
+#source('../Functions/cleanplot.pca.R')
+par(mfrow=c(1,2))
+cleanplot.pca(env.pca, ax1=1, ax2=2, scaling=1, plot.sites=TRUE, 
+             plot.spe=TRUE, label.sites=FALSE, label.spe=TRUE, cex.char1=0.7)
+cleanplot.pca(env.pca, ax1=1, ax2=2, scaling=2, plot.sites=TRUE, 
+             plot.spe=TRUE, label.sites=FALSE, label.spe=TRUE, cex.char1=0.7)
+
+```
+```{r}
+# Perform PCA
+pca_result <- rda(d.env.sc)
+
+# Summary of PCA result
+summary(pca_result)
+
+# Extract PCA scores for plotting
+scores <- scores(pca_result, display = "sites")
+scores_df <- as.data.frame(scores)
+#scores_df$SampleID <- df$SampleID
+
+# Plot PCA
+p <- ggplot(scores_df, aes(x = PC1, y = PC2)) +
+  geom_point() +
+  #geom_text(aes(label = SampleID), vjust = -1) +
+  labs(title = "PCA of Environmental Data",
+       x = "PC1",
+       y = "PC2") +
+  theme_minimal()
+
+# Display plot
+print(p)
+
+# PCA loadings
+loadings <- scores(pca_result, display = "species")
+loadings_df <- as.data.frame(loadings)
+
+# Print loadings
+print(loadings_df)
+```
+
+
+
+```{r}
+# Get the site scores, scaling 1
+sit.sc1 <- scores(env.pca, display="wa", scaling=1)
+
+d.env$PCA1 <- sit.sc1[,1]
+d.env$PCA2 <- sit.sc1[,2]
+d.env$wdate <- casteddates
+
+ggplot(d.env, aes(x=PCA1, y=PCA2, color=log(Chla)))+
+  geom_point()+scale_color_viridis_c()+
+  geom_vline(xintercept = 0)+
+  geom_hline(yintercept = 0)+
+theme_bw()
+```
+
+
+
+```{r}
+ggplot(d.env, aes(x=PCA1, y=log(Chla)))+
+  geom_point()+
+theme_bw()
+
+ggplot(d.env, aes(x=wdate, y=PCA1))+
+  geom_point()+
+theme_bw()
+
+ggplot(d.env, aes(x=Temp, y=PCA1))+
+  geom_point()+
+theme_bw()
+
+ggplot(d.env, aes(x=NO3, y=PCA1))+
+  geom_point()+
+theme_bw()
+
+ggplot(d.env, aes(x=NO3, y=Temp, color=PCA1))+
+  geom_point()+scale_color_viridis_c()+
+theme_bw()
+```
+
+
+
+
+
+## Cyanobactéries & Oxygène 
+
+
+That's a good one but the colors should be replaced by cluster of stations. 
+```{r}
+ddf <- df %>% filter( !is.na(OD) & !is.na(CYAN) & CYAN!=0 &month(datetime)>3 & month(datetime)<13) # & CYAN!=0 )
+
+ggplot(ddf, aes(x=OD, y = log10(CYAN+1), color = Sites))+
+  #geom_smooth(method = 'lm')+
+  geom_boxplot(aes(group=cut(OD, 5)), notch = FALSE)+theme_bw()+
+    #geom_boxplot(aes(group=ntile(OD, 5)), notch = FALSE)+theme_bw()+
+  geom_point()+xlab('Dissolved Oxygen - [mg/l]')+ylab('Cyanobacteries: Abundance - [log(ind/ml)]')
+
+
+
+ggplot(ddf, aes(x=OD, y = CYAN, color = Sites))+
+  #geom_smooth(method = 'lm')+
+  geom_boxplot(aes(group=cut(OD, 5)), notch = FALSE)+theme_bw()+
+    #geom_boxplot(aes(group=ntile(OD, 5)), notch = FALSE)+theme_bw()+
+  geom_point()+xlab('Dissolved Oxygen - [mg/l]')+ylab('Cyanobacteries: Abundance - [ind/ml]')+scale_y_log10()
+
+
+cor.test(ddf$OD, log(ddf$CYAN+1))
+```
+```{r}
+df
+```
+
