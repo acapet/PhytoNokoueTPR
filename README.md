@@ -9,9 +9,10 @@ The goal of PhytoNokoueTPR is to provide interactive material for R lessons on e
 ## Installation
 
 You can install the development version of PhytoNokoueTPR from [GitHub](https://github.com/) with:
+(If you have done some package management, the package devtools may already be installed. If this is the case, comment the first line below.)
 
 ``` r
-# install.packages("devtools")
+install.packages("devtools")
 devtools::install_github("acapet/PhytoNokoueTPR")
 ```
 
